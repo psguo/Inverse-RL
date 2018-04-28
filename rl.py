@@ -30,23 +30,22 @@ def value_iteration(env, gamma, max_iterations=int(1e3), tol=1e-3):
     value_function:  Optimal value function
     iteration: number of iterations it took to converge.
   """
-
   value_func = np.zeros(env.nS)
   itr = 0
   delta = tol
   while delta >= tol and itr < max_iterations:
     delta = 0
-    Vs = np.ones(env.nS) * (-np.inf)
     for s in range(env.nS):
       v = value_func[s]
+      value_func_new = -np.inf
       for a in range(env.nA):
         action_value = 0
         for next_state in env.P[s][a]:
           action_value += next_state[0] * (next_state[2] + gamma * value_func[next_state[1]])
-        if Vs[s] < action_value:
-          Vs[s] = action_value
-      delta = max(delta, abs(v - Vs[s]))
-    value_func = Vs.copy()
+        if value_func_new < action_value:
+          value_func_new = action_value
+      delta = max(delta, abs(v - value_func_new))
+      value_func[s] = value_func_new
     itr += 1
 
   return value_func, itr
@@ -114,16 +113,15 @@ def evaluate_policy(env, gamma, policy, max_iterations=int(1e3), tol=1e-3):
   delta = tol
   while delta >= tol and itr < max_iterations:
     delta = 0
-    Vs = np.zeros(env.nS)
     for s in range(env.nS):
       v = value_func[s]
       a = policy[s]
       next_possibles = env.P[s][a]
-      Vs[s] = 0
+      value_func_new = 0
       for next in next_possibles:
-        Vs[s] += next[0] * (next[2] + gamma * value_func[next[1]])
-      delta = max(delta, abs(v - Vs[s]))
-    value_func = Vs.copy()
+        value_func_new += next[0] * (next[2] + gamma * value_func[next[1]])
+      delta = max(delta, abs(v - value_func_new))
+      value_func[s] = value_func_new
     itr += 1
   return value_func, itr
 
@@ -153,13 +151,6 @@ def improve_policy(env, gamma, value_func, policy):
   policy_changed = False
   for s in range(env.nS):
     old_action = policy[s]
-
-    # action_values = np.zeros(env.nA)
-    # for a in range(env.nA):
-    #     next_values = [possible[0] * (possible[2] + gamma * value_func[possible[1]]) for possible in
-    #                    env.P[s][a]]
-    #     action_values[a] = np.sum(next_values)
-    # policy[s] = np.argmax(action_values)
 
     best_action = 0
     best_action_value = -np.inf
@@ -215,7 +206,7 @@ def policy_iteration(env, gamma, max_iterations=int(1e3), tol=1e-3):
   return policy, value_func, itr + 1, eval_itr_total
 
 
-def td_zero(env, gamma, policy, alpha):
+def td_zero(env, gamma, policy, alpha, max_iterations = 100):
   """
   Q3.2.2
   This implements TD(0) for calculating the value function given a policy.
@@ -238,7 +229,6 @@ def td_zero(env, gamma, policy, alpha):
   """
 
   value_func = np.zeros(env.nS)
-  max_iterations = 10000
   itr = 0
   while itr < max_iterations:
     s = env.reset()
@@ -252,7 +242,7 @@ def td_zero(env, gamma, policy, alpha):
   return value_func
 
 
-def n_step_td(env, gamma, policy, alpha, n):
+def n_step_td(env, gamma, policy, alpha, n, max_iterations = 100):
   """
   Q3.2.4: BONUS
   This implements n-step TD for calculating the value function given a policy.
@@ -277,7 +267,7 @@ def n_step_td(env, gamma, policy, alpha, n):
   """
 
   value_func = np.zeros(env.nS)
-  max_iterations = 10000
+
   itr = 0
   while itr < max_iterations:
     s = env.reset()
@@ -295,20 +285,17 @@ def n_step_td(env, gamma, policy, alpha, n):
     G = np.zeros(T)
     for t in range(T):
       if t + n < T:
-        s = states[t]
-        V_end = value_func[s]
+        V_end = value_func[states[t+n]]
       else:
         V_end = 0
       discounted_rewards = np.zeros((n,))
       for k in range(n):
         if t + k < T:
           discounted_rewards[k] = np.power(gamma, k) * rewards[t + k]
-
       G[t] = (gamma ** n) * V_end + np.sum(discounted_rewards)
 
-    for t in range(T):
-      s = states[t]
-      value_func[s] = value_func[s] + alpha * (G[t] - value_func[s])
+      s_hist = states[t]
+      value_func[s_hist] = value_func[s_hist] + alpha * (G[t] - value_func[s_hist])
 
     itr += 1
   return value_func
@@ -324,7 +311,7 @@ def print_values(values, shape):
     for j in range(shape[1]):
       if values[i][j] >= 0:
         row_str += "{} "
-      row_str += "%.2f" % values[i][j] + ' '
+      row_str += "%.3f" % values[i][j] + ' '
     print('    ' + row_str + '\\\\')
 
 
@@ -348,23 +335,32 @@ if __name__ == "__main__":
   shape = (8, 8)
   action_names = {0: 'L', 1: 'D', 2: 'R', 3: 'U'}
 
+  td_max_itr = 1000
+
+  np.random.seed(1)
+
   # Q3.2.1
   V_vi, n_iter = value_iteration(env, gamma)
   policy = policy_from_value_function(env, V_vi, gamma)
-  # print("Itr: ", n_iter)
-  # print_policy(policy, shape, action_names)
-  # print_values(V_vi, shape)
+  print("Value Iteration: ")
+  print("Itr: ", n_iter)
+  print_policy(policy, shape, action_names)
+  print_values(V_vi, shape)
 
   # Q3.2.2: BONUS
-  # policy, V_pi, n_iter, eval_itr_total = policy_iteration(env, gamma)
-  # print("Itr: ", n_iter)
-  # print_policy(policy, shape, action_names)
-  # print_values(V_pi, shape)
+  policy, V_pi, n_iter, eval_itr_total = policy_iteration(env, gamma)
+  print("Policy Iteration: ")
+  print("Itr: ", n_iter)
+  print("Total itr: ", eval_itr_total)
+  print_policy(policy, shape, action_names)
+  print_values(V_pi, shape)
 
   # Q3.2.3
-  # V_td = td_zero(env, gamma, policy, alpha)
-  # print_values(V_td, shape)
+  V_td = td_zero(env, gamma, policy, alpha, max_iterations=td_max_itr)
+  print("TD(0): ")
+  print_values(V_td, shape)
 
   # Q3.2.4: BONUS
-  V_ntd = n_step_td(env, gamma, policy, alpha, n)
+  V_ntd = n_step_td(env, gamma, policy, alpha, n, max_iterations=td_max_itr)
+  print("n-step TD: ")
   print_values(V_ntd, shape)

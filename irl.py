@@ -110,7 +110,7 @@ if __name__ == "__main__":
   # Q3.3.5
   # Set R_max and l1 as you want.
   R_max = 1
-  l1 = 0.2
+  l1 = 0.3
   R = irl_lp(policy, T, gamma, R_max, l1)
   print("R: ")
   rl.print_values(R, shape)
