@@ -10,7 +10,7 @@ import cvxopt as cvx
 import gridworld
 import rl
 
-def irl_lp(policy, T_probs, discount, R_max, l1):
+def irl_lp(policy, T_probs, gamma, R_max, l1):
   """
   Solves the linear program formulation for finite discrete state IRL.
 
@@ -50,10 +50,15 @@ def irl_lp(policy, T_probs, discount, R_max, l1):
   G_4 = np.hstack((-np.eye(nS), -np.eye(nS), np.zeros((nS, nS))))
 
   G_temp = []
+
+  P_a_star = []
+  for s in range(nS):
+    P_a_star.append(T_probs[s, policy[s], :])
+  P_a_star = np.array(P_a_star)
+  inv_temp = np.linalg.inv(np.eye(nS) - gamma * P_a_star)
+
   for s in range(nS):
     a_star = int(policy[s])
-    inv_temp = np.linalg.inv(np.eye(nS)-discount*T_probs[:,a_star,:])
-
     G_s = []
     for a in range(nA):
       if a != a_star:
@@ -104,15 +109,17 @@ if __name__ == "__main__":
 
   # Q3.3.5
   # Set R_max and l1 as you want.
-  R_max = 10
-  l1 = 1
+  R_max = 1
+  l1 = 0.2
   R = irl_lp(policy, T, gamma, R_max, l1)
+  print("R: ")
+  rl.print_values(R, shape)
 
   # You can test out your R by re-running VI with your new rewards as follows:
   env_irl = gridworld.GridWorld(map_name='8x8', R=R)
   Vs_irl, n_iter_irl = rl.value_iteration(env_irl, gamma)
   policy_irl = rl.policy_from_value_function(env_irl, Vs_irl, gamma)
 
-
+  print("Values: ")
   rl.print_values(Vs_irl, shape)
   rl.print_policy(policy_irl, shape, action_names)
